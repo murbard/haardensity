@@ -1,23 +1,24 @@
 <!DOCTYPE html>
-<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
-<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
-<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js"> <!--<![endif]-->
-    <head>
-        <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <title></title>
-        <meta name="description" content="">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+<!--[if lt IE 7]>
+<html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>
+<html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>
+<html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!-->
+<html class="no-js"> <!--<![endif]-->
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>Haar density estimator</title>
+<meta name="description" content="">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-        <!-- Place favicon.ico and apple-touch-icon.png in the root directory -->
+<!-- Place favicon.ico and apple-touch-icon.png in the root directory -->
 
-        <link rel="stylesheet" href="css/normalize.css">
-        <link rel="stylesheet" href="css/main.css">
-        <script src="js/vendor/modernizr-2.6.2.min.js"></script>
-        <script>
+<script>
 
-        function HSVtoRGB(h, s, v) {
+function HSVtoRGB(h, s, v) {
     var r, g, b, i, f, p, q, t;
     if (h && s === undefined && v === undefined) {
         s = h.s, v = h.v, h = h.h;
@@ -28,258 +29,348 @@
     q = v * (1 - f * s);
     t = v * (1 - (1 - f) * s);
     switch (i % 6) {
-        case 0: r = v, g = t, b = p; break;
-        case 1: r = q, g = v, b = p; break;
-        case 2: r = p, g = v, b = t; break;
-        case 3: r = p, g = q, b = v; break;
-        case 4: r = t, g = p, b = v; break;
-        case 5: r = v, g = p, b = q; break;
+        case 0:
+            r = v, g = t, b = p;
+            break;
+        case 1:
+            r = q, g = v, b = p;
+            break;
+        case 2:
+            r = p, g = v, b = t;
+            break;
+        case 3:
+            r = p, g = q, b = v;
+            break;
+        case 4:
+            r = t, g = p, b = v;
+            break;
+        case 5:
+            r = v, g = p, b = q;
+            break;
     }
-    return  "rgb("+Math.floor(r * 255)+","+Math.floor(g * 255)+","+Math.floor(b * 255)+")";
+    return [Math.floor(r * 255),Math.floor(g*255),Math.floor(b*255)];
+}
+
+function QTree() {
+    this.n = 0;
+    this.x = 0;
+    this.y = 0;
+    this.isLeaf = true;
+    this.p = 0;
+    this.NW = null;
+    this.NE = null;
+    this.SW = null;
+    this.SE = null;
+}
+
+TREE = new QTree();
+
+
+function push_sub(tree, x, y, xmin, xmax, ymin, ymax) {
+
+    var xm = Math.floor((xmin + xmax) / 2);
+    var ym = Math.floor((ymin + ymax) / 2);
+    if (x < xm && y < ym)
+        push(tree.NW, x, y, xmin, xm, ymin, ym);
+    if (x >= xm && y < ym)
+        push(tree.NE, x, y, xm, xmax, ymin, ym);
+    if (x < xm && y >= ym)
+        push(tree.SW, x, y, xmin, xm, ym, ymax);
+    if (x >= xm && y >= ym)
+        push(tree.SE, x, y, xm, xmax, ym, ymax);
+}
+
+
+function push(tree, x, y, xmin, xmax, ymin, ymax) {
+//    console.log(x, y);
+    if (tree.isLeaf) {
+        if (tree.n == 0) {
+            tree.x = x;
+            tree.y = y;
+            tree.n = 1;
+        //    console.log("point " + x + ", " + y + ". has found its place inside " + xmin + ", " + xmax + ", " + ymin + ", " + ymax );
+            return;
+        }
+        if ((tree.x == x) && (tree.y == y)) {
+          //  console.log("point " + x + ", " + y + ". has found its place inside " + xmin + ", " + xmax + ", " + ymin + ", " + ymax );
+            ++tree.n;
+            return;
+        }
+        tree.isLeaf = false;
+        tree.NW = new QTree();
+        tree.NE = new QTree();
+        tree.SW = new QTree();
+        tree.SE = new QTree();
+        //console.log("Disloding point " + tree.x + ", " + tree.y + ". Pushing it further down...");
+        push_sub(tree, tree.x, tree.y, xmin, xmax, ymin, ymax);
+    }
+    ++tree.n;
+    //console.log("pushing point " + x + ", " + y + ". further down");
+    push_sub(tree, x, y, xmin, xmax, ymin, ymax);
+
+}
+
+function point(imgd, x, y, r, g, b) {
+
+    // Calculate the pixel offset from the coordinates
+    var idx = (x + (y * imgd.width)) * 4;
+
+    // Modify the graphic data
+    imgd.data[idx] = r;     // Red
+    imgd.data[idx+1] = g;   // Green
+    imgd.data[idx+2] = b;   // Blue
+    imgd.data[idx+3] = 255; // Alpha channel
+}
+
+function initialize() {
+    ctx = document.getElementById("myCanvas").getContext("2d");
+    ctx.fillStyle = "rgb(240,240,240)"; // light grey
+    ctx.fillRect(0, 0, 512, 512);
+    ctx = document.getElementById("colorscale").getContext("2d");
+    imgd = ctx.createImageData(20,512);
+    for (var y = 0; y < 512; ++y)
+        for(var x = 0; x < 20; ++x) {
+            rgb = HSVtoRGB(3/4*(y/512.0),1.0,1.0);
+            point(imgd, x, y, rgb[0], rgb[1], rgb[2]);
+        }
+    ctx.putImageData(imgd,0,0);
+}
+
+
+function B(L) {
+    var f = 1.0;
+    var c = 1;
+    for (var k in L)
+        for (var i = 1; i <= L[k]; ++i, ++c)
+            f *= i / c;
+    return f;
+}
+
+function drawGamma(n) {
+    var r = 0;
+    for (var i = 0; i < n; ++i)
+        r -= Math.log(1 - Math.random());
+    return r;
+}
+
+function drawDirichlet(X) {
+    var g = [];
+    var s = 0;
+    for (var i in X)
+        s += g[i] = drawGamma(X[i] + 1);
+    for (var i in g)
+        g[i] /= s;
+    return g;
+}
+
+function pqrs(q, w) {
+
+    if (q.Z == null) {
+        q.Z = [];
+        q.Z[0] = Math.pow(0.25, q.n);
+
+        q.Z[1] = q.Z[0] + B([q.NW.n + q.NE.n, q.SW.n + q.SE.n]) * Math.pow(0.5, q.n) * Math.exp(-w);
+        q.Z[2] = q.Z[1] + B([q.NW.n + q.SW.n, q.NE.n + q.SE.n]) * Math.pow(0.5, q.n) * Math.exp(-w);
+        q.Z[3] = q.Z[2] + B([q.NW.n + q.SE.n, q.NE.n + q.SW.n]) * Math.pow(0.5, q.n) * Math.exp(-w);
+
+        q.Z[4] = q.Z[3] + B([q.NW.n, q.NE.n]) * B([q.SW.n, q.SE.n]) * Math.pow(0.5, q.n) * Math.exp(-2 * w);
+        q.Z[5] = q.Z[4] + B([q.NW.n, q.SW.n]) * B([q.NE.n, q.SE.n]) * Math.pow(0.5, q.n) * Math.exp(-2 * w);
+        q.Z[6] = q.Z[5] + B([q.NW.n, q.SE.n]) * B([q.NE.n, q.SW.n]) * Math.pow(0.5, q.n) * Math.exp(-2 * w);
+
+        q.Z[7] = q.Z[6] + B([q.NW.n, q.SE.n, q.NE.n, q.SW.n]) * Math.exp(-3 * w);
+    }
+
+    var u = Math.random() * q.Z[7];
+    var K = -1;
+    for (var i = 0; i < 8; ++i) {
+        if (u < q.Z[i]) {
+            K = i;
+            break;
+        }
+    }
+    //console.log(u,  K);
+    switch (K) {
+        case 0:
+            return [0.25, 0.25, 0.25, 0.25];
+        case 1:
+            p = drawDirichlet([q.NW.n + q.NE.n, q.SW.n + q.SE.n]);
+            return [p[0] / 2, p[0] / 2, p[1] / 2, p[1] / 2];
+        case 2:
+            p = drawDirichlet([q.NW.n + q.SW.n, q.NE.n + q.SE.n]);
+            return [p[0] / 2, p[1] / 2, p[0] / 2, p[1] / 2];
+        case 3:
+            p = drawDirichlet([q.NW.n + q.SE.n, q.NE.n + q.SW.n]);
+            return [p[0] / 2, p[1] / 2, p[1] / 2, p[0] / 2];
+        case 4:
+            p1 = drawDirichlet([q.NW.n, q.NE.n]);
+            p2 = drawDirichlet([q.SW.n, q.SE.n]);
+            return [p1[0] / 2, p1[1] / 2, p2[0] / 2, p2[1] / 2];
+        case 5:
+            p1 = drawDirichlet([q.NW.n, q.SW.n]);
+            p2 = drawDirichlet([q.NE.n, q.SE.n]);
+            return [p1[0] / 2, p2[0] / 2, p1[1] / 2, p2[1] / 2];
+        case 6:
+            p1 = drawDirichlet([q.NW.n, q.SE.n]);
+            p2 = drawDirichlet([q.NE.n, q.SW.n]);
+            return [p1[0] / 2, p2[0] / 2, p2[1] / 2, p1[1] / 2];
+        case 7:
+            return drawDirichlet([q.NW.n, q.NE.n, q.SW.n, q.SE.n]);
+    }
+
+}
+
+function cleart(q) {
+    q.Z = null;
+    if (q.isLeaf) {
+        q.p = 0;
+        return;
+    }
+
+    cleart(q.NW); cleart(q.NE); cleart(q.SE); cleart(q.SW);
 
 
 }
 
-            function QTree()
-            {
-                this. n = 0; this.x = 0; this.y = 0; this.isLeaf = true; this.p = 0;
-                this.NW = null; this.NE = null; this.SW = null; this.SE = null;
-            };
-            TREE = new QTree();
+function sample(q, w, t) {
+    if (q.isLeaf) {
+        q.p += t;
+        return;
+    }
+    p = pqrs(q, w);
+
+    sample(q.NW, w, p[0] * t);
+    sample(q.NE, w, p[1] * t);
+    sample(q.SW, w, p[2] * t);
+    sample(q.SE, w, p[3] * t);
+}
+
+function doit() {
+    cleart(TREE);
+    w = parseFloat(document.getElementById("regularization").value);
+    N = parseInt(document.getElementById("samples").value);
+    for (var i = 0; i < N; ++i)
+        sample(TREE, w, 1);
+    var mm = get_max_draw(TREE, 0, 512, 0, 512);
+    ctx = document.getElementById("myCanvas").getContext("2d");
+
+    draw(TREE, 0, 512, 0, 512, mm, ctx);
+
+}
+
+function get_max_draw(q, xmin, xmax, ymin, ymax) {
+    if (q.isLeaf) {
+       // console.log(q.p, xmin, xmax, ymin, ymax, q.p / ((ymax - ymin + 1) * (xmax - xmin + 1)));
+        return q.p / ((ymax - ymin + 1) * (xmax - xmin + 1));
+
+    }
+    var xm = Math.floor((xmin + xmax) / 2);
+    var ym = Math.floor((ymin + ymax) / 2);
+    return Math.max(
+            get_max_draw(q.NW, xmin, xm, ymin, ym),
+            get_max_draw(q.NE, xm, xmax, ymin, ym),
+            get_max_draw(q.SW, xmin, xm, ym, ymax),
+            get_max_draw(q.SE, xm, xmax, ym, ymax)
+    );
+}
 
 
-            function push_sub(tree, x, y, xmin, xmax, ymin, ymax)
-            {
+function draw(q, xmin, xmax, ymin, ymax, mm, ctx) {
 
-                    xm = Math.floor((xmin+xmax)/2);
-                    ym = Math.floor((ymin+ymax)/2);
-                    if(x < xm && y < ym)
-                        push(tree.NW, x, y, xmin, xm, ymin, ym);
-                    if(x >= xm && y < ym)
-                        push(tree.NE, x, y, xm, xmax, ymin, ym);
-                    if(x < xm && y >= ym)
-                        push(tree.SW, x, y, xmin, xm, ym, ymax);
-                    if(x >= xm && y >= ym)
-                        push(tree.SE, x, y, xm, xmax, ym, ymax);
-            };
+    if (q.isLeaf) {
+        var c =  255-Math.floor(256 * Math.pow(q.p / (mm * (ymax - ymin + 1) * (xmax - xmin + 1)), 1.0/2.2) - 1e-13);
+        //console.log(q.p, c, xmin, xmax, ymin, ymax);
 
-            function push(tree, x, y, xmin, xmax, ymin, ymax)
-            {
-                console.log(x,y);
-                if (tree.isLeaf) {
-                    if (tree.n==0) { tree.x = x; tree.y = y; tree.n = 1; return; }
-                    if ((tree.x == x) && (tree.y == y)) {++tree.n; return;}
-                    tree.isLeaf = false;
-                    tree.NW = new QTree();
-                    tree.NE = new QTree();
-                    tree.SW = new QTree();
-                    tree.SE = new QTree();
-                    push_sub(tree, tree.x, tree.y, xmin, xmax, ymin, ymax);
-                }
-                ++tree.n;
-                push_sub(tree, x, y, xmin, xmax, ymin, ymax);
+        rgb = HSVtoRGB(c / 255 * 3 / 4, 1.0, 1.0);
+        ctx.fillStyle =  "rgb(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ")";
+        ctx.fillRect(xmin, ymin, xmax - xmin, ymax - ymin);
+        return;
+    }
 
-            };
-            function initialize()
-            {
-                ctx = document.getElementById("myCanvas").getContext("2d");
-                ctx.fillStyle = "rgb(200,255,200)";
-                ctx.fillRect(0,0,512,512);
-            };
-
-            function addDataPoint(e)
-            {
-
-                ctx = document.getElementById("myCanvas").getContext("2d");
-                ctx.beginPath();
-                ctx.arc(e.clientX, e.clientY,3,0,2*Math.PI);
-                ctx.strokeStyle = "red";
-                ctx.stroke();
-                push(TREE, e.clientX, e.clientY, 0, 512, 0, 512)
-            }
+    var xm = Math.floor((xmin + xmax) / 2);
+    var ym = Math.floor((ymin + ymax) / 2);
+    draw(q.NW, xmin, xm, ymin, ym, mm, ctx);
+    draw(q.NE, xm, xmax, ymin, ym, mm, ctx);
+    draw(q.SW, xmin, xm, ym, ymax, mm, ctx);
+    draw(q.SE, xm, xmax, ym, ymax, mm, ctx);
 
 
-            function B(L)
-            {
-                var f = 1.0;
-                var c = 1;
-                for(var k in L)
-                    for(var i = 1; i <= L[k]; ++i, ++c)
-                        f *= i/c;
-                 return f;
-            }
-
-            function drawGamma(n)
-            {
-                var r = 0;
-                for(var i = 0; i < n; ++i)
-                    r -= Math.log(1-Math.random());
-                return r;
-            }
-
-            function drawDirichlet(X)
-            {
-                var g = [];
-                var s = 0;
-                for(var i in X)
-                    s += g[i] = drawGamma(X[i]+1);
-                for(var i in g)
-                    g[i] /= s;
-                return g;
-            }
-
-            function pqrs(q, w)
-            {
-
-                if (q.Z == null) {
-                    q.Z = [];
-                    q.Z[0] = Math.pow(0.25, q.n);
-
-                    q.Z[1] = q.Z[0] +  B([q.NW.n + q.NE.n, q.SW.n + q.SE.n]) * Math.pow(0.5, q.n) * Math.exp(-w);
-                    q.Z[2] = q.Z[1] + B([q.NW.n + q.SW.n, q.NE.n + q.SE.n]) * Math.pow(0.5, q.n) * Math.exp(-w);
-                    q.Z[3] = q.Z[2] + B([q.NW.n + q.SE.n, q.NE.n + q.SW.n]) * Math.pow(0.5, q.n) * Math.exp(-w);
-
-                    q.Z[4] = q.Z[3] + B([q.NW.n, q.NE.n]) * B([q.SW.n, q.SE.n]) * Math.pow(0.5, q.n) * Math.exp(-2*w);
-                    q.Z[5] = q.Z[4] + B([q.NW.n, q.SW.n]) * B([q.NE.n, q.SE.n]) * Math.pow(0.5, q.n) * Math.exp(-2*w);
-                    q.Z[6] = q.Z[5] + B([q.NW.n, q.SE.n]) * B([q.NE.n, q.SW.n]) * Math.pow(0.5, q.n) * Math.exp(-2*w);
-
-                    q.Z[7] = q.Z[6] + B([q.NW.n, q.SE.n, q.NE.n, q.SW.n]) * Math.exp(-3*w);
-                }
-                var u = Math.random()*q.Z[7];
-                var K = -1;
-                for(var i = 0; i < 8; ++i) {
-                    if (u < q.Z[i]) {
-                        K = i;
-                        break;
-                    }
-                }
-                //console.log(u,  K);
-                switch(K)
-                {
-                    case 0:
-                        return [0.25,0.25,0.25,0.25];
-                    case 1:
-                        p = drawDirichlet([q.NW.n+q.NE.n, q.SW.n+ q.SE.n]);
-                        return [p[0]/2,p[0]/2,p[1]/2,p[1]/2];
-                    case 2:
-                        p = drawDirichlet([q.NW.n+q.SW.n, q.NE.n+ q.SE.n]);
-                        return [p[0]/2,p[1]/2,p[0]/2,p[1]/2];
-                    case 3:
-                        p = drawDirichlet([q.NW.n+q.SE.n, q.NE.n+ q.SW.n]);
-                        return [p[0]/2,p[1]/2,p[1]/2,p[0]/2];
-                    case 4:
-                        p1 = drawDirichlet([q.NW.n, q.NE.n]);
-                        p2 = drawDirichlet([q.SW.n, q.SE.n]);
-                        return [p1[0]/2,p1[1]/2,p2[0]/2,p2[1]/2];
-                    case 5:
-                        p1 = drawDirichlet([q.NW.n, q.SW.n]);
-                        p2 = drawDirichlet([q.NE.n, q.SE.n]);
-                        return [p1[0]/2,p2[0]/2,p1[1]/2,p2[1]/2];
-                    case 6:
-                        p1 = drawDirichlet([q.NW.n, q.SE.n]);
-                        p2 = drawDirichlet([q.NE.n, q.SW.n]);
-                        return [p1[0]/2,p2[0]/2,p2[1]/2,p1[1]/2];
-                    case 7:
-                        return drawDirichlet([q.NW.n,q.NE.n,q.SW.n,q.SE.n]);
-                }
-
-          };
-
-          function sample(q,w,t)
-          {
-              if (q.isLeaf)
-              {
-                  q.p += t;
-                  return;
-              }
-              p = pqrs(q,w);
-
-              sample(q.NW,w,p[0]*t);
-              sample(q.NE,w,p[1]*t);
-              sample(q.SW,w,p[2]*t);
-              sample(q.SE,w,p[3]*t);
-          }
-
-          function doit(w,N)
-          {
-              for(var i = 0; i < N; ++i)
-                sample(TREE,w,1);
-              var mm = get_max_draw(TREE,0,512,0,512);
-              ctx = document.getElementById("myCanvas").getContext("2d");
-
-              draw(TREE,0,512,0,512,mm,ctx);
-
-          }
-
-          function get_max_draw(q,xmin,xmax,ymin,ymax)
-          {
-              if (q.isLeaf) {
-                  console.log(q.p, xmin,xmax,ymin,ymax,q.p/((ymax-ymin+1)*(xmax-xmin+1)));
-                return q.p/((ymax-ymin+1)*(xmax-xmin+1));
-
-              }
-              var xm = Math.floor((xmin+xmax)/2);
-              var ym = Math.floor((ymin+ymax)/2);
-              return Math.max(
-                      get_max_draw(q.NW,xmin,xm,ymin,ym),
-                      get_max_draw(q.NE,xm,xmax,ymin,ym),
-                      get_max_draw(q.SW,xmin,xm,ym,ymax),
-                      get_max_draw(q.SE,xm,xmax,ym,ymax)
-              );
-          };
-
-          function draw(q,xmin,xmax,ymin,ymax,mm,ctx)
-          {
-
-              if (q.isLeaf) {
-                var c = 255-Math.floor(256*Math.pow(q.p/(mm*(ymax-ymin+1)*(xmax-xmin+1)),1/2.2)-1e-13);
-                console.log(q.p, c, xmin,xmax,ymin, ymax);
+}
 
 
-                ctx.fillStyle =  HSVtoRGB(c/255,1.0,1.0);// "rgb(" + c + "," + c + "," + c + ")";
-                ctx.fillRect(xmin,ymin,xmax-xmin,ymax-ymin);
-                return;
-              }
+function addDataPoint(e) {
+    var cv = document.getElementById("myCanvas2");
 
-              var xm = Math.floor((xmin+xmax)/2);
-              var ym = Math.floor((ymin+ymax)/2);
-              draw(q.NW,xmin,xm,ymin,ym,mm,ctx);
-              draw(q.NE,xm,xmax,ymin,ym,mm,ctx);
-              draw(q.SW,xmin,xm,ym,ymax,mm,ctx);
-              draw(q.SE,xm,xmax,ym,ymax,mm,ctx);
+    var totalOffsetX = 0;
+    var totalOffsetY = 0;
+    var canvasX = 0;
+    var canvasY = 0;
+    var currentElement = cv;
+    do{
+        totalOffsetX += currentElement.offsetLeft - currentElement.scrollLeft;
+        totalOffsetY += currentElement.offsetTop - currentElement.scrollTop;
+    }
+    while(currentElement = currentElement.offsetParent);
+
+    var x = e.pageX - totalOffsetX;
+    var y = e.pageY - totalOffsetY;
+
+
+    var ctx = cv.getContext("2d");
+
+    ctx.beginPath()
+    ctx.arc(x, y, 2, 0, 2 * Math.PI, false);
+
+    ctx.fillStyle = "white";
+    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "black";
+
+    ctx.stroke();
+    ctx.closePath();
 
 
 
-          };
-
-        </script>
-    </head>
-    <body>
-        <!--[if lt IE 7]>
-            <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
-        <![endif]-->
-
-
-        <canvas id="myCanvas" width="512" height="512"  onload="initialize()" onmousedown="addDataPoint(event)">
-
-        </canvas>
-        <button name="doit" onclick="doit(1,1000)">doit</button>
+    push(TREE, x, y, 0, 512, 0, 512);
+    doit();
+}
 
 
 
-        <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
-        <script>window.jQuery || document.write('<script src="js/vendor/jquery-1.10.2.min.js"><\/script>')</script>
-        <script src="js/plugins.js"></script>
-        <script src="js/main.js"></script>
+</script>
+</head>
+<body>
+<!--[if lt IE 7]>
+<p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade
+    your browser</a> to improve your experience.</p>
+<![endif]-->
 
-        <!-- Google Analytics: change UA-XXXXX-X to be your site's ID. -->
-        <script>
-            (function(b,o,i,l,e,r){b.GoogleAnalyticsObject=l;b[l]||(b[l]=
-            function(){(b[l].q=b[l].q||[]).push(arguments)});b[l].l=+new Date;
-            e=o.createElement(i);r=o.getElementsByTagName(i)[0];
-            e.src='//www.google-analytics.com/analytics.js';
-            r.parentNode.insertBefore(e,r)}(window,document,'script','ga'));
-            ga('create','UA-XXXXX-X');ga('send','pageview');
-        </script>
-    </body>
+<div>
+    <div style="position:relative;padding:0px;margin:0px;width:512px;height:512px;float:left;background:green;">
+        <canvas id="myCanvas" style="border:1px solid black;position:absolute;background:transparent;z-index:1;" width="512" height="512" onclick="addDataPoint(event)"></canvas>
+        <canvas id="myCanvas2" style="border:1px solid black;position:absolute;background:transparent;z-index:2;" width="512" height="512" onclick="addDataPoint(event)"></canvas>
+    </div>
+    <div style="float:left;position:relative">
+        <canvas id="colorscale" style="border:1px solid black;position:absolute;float:left;top:0px;left:10px;" width="20" height="512"></canvas>
+    </div>
+</div>
+
+<div style="position:absolute;top:532px;">
+    <label for="samples">number of samples</label>
+<input name="samples" id="samples" value="10000"/><br/>
+<label for="regularization">regularization parameter</label>
+<input name="regularization" id="regularization" value="1.2"/><br/>
+<button name="doit" onclick="doit()">sample</button>
+</div>
+
+
+
+
+<script>
+    initialize();
+</script>
+<br/>
+
+
+
+</body>
 </html>
