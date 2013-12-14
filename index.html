@@ -180,15 +180,18 @@ function pqrs(q, w) {
         q.Z[7] = q.Z[6] + B([q.NW.n, q.SE.n, q.NE.n, q.SW.n]) * Math.exp(-3 * w);
     }
 
-    var u = Math.random() * q.Z[7];
     var K = -1;
+
+    var u = Math.random() * q.Z[7];
+
+
     for (var i = 0; i < 8; ++i) {
         if (u < q.Z[i]) {
             K = i;
             break;
         }
     }
-    //console.log(u,  K);
+    //console.log(K);
     switch (K) {
         case 0:
             return [0.25, 0.25, 0.25, 0.25];
@@ -215,12 +218,16 @@ function pqrs(q, w) {
             return [p1[0] / 2, p2[0] / 2, p2[1] / 2, p1[1] / 2];
         case 7:
             return drawDirichlet([q.NW.n, q.NE.n, q.SW.n, q.SE.n]);
+
+        default:
+            alert("danger, will robinson!");
     }
 
 }
 
 function cleart(q) {
     q.Z = null;
+    q.p = 0;
     if (q.isLeaf) {
         q.p = 0;
         return;
@@ -232,16 +239,25 @@ function cleart(q) {
 }
 
 function sample(q, w, t) {
+
     if (q.isLeaf) {
         q.p += t;
         return;
     }
-    p = pqrs(q, w);
+    //if (q.NE.n==0) {
+      //  console.log(t);
+    //}
+    var p = pqrs(q, w);
 
     sample(q.NW, w, p[0] * t);
     sample(q.NE, w, p[1] * t);
     sample(q.SW, w, p[2] * t);
     sample(q.SE, w, p[3] * t);
+
+
+
+
+
 }
 
 function doit() {
