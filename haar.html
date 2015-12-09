@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]>
+<html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>
+<html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>
+<html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!-->
+<html class="no-js"><!--<![endif]--><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>Haar density estimator</title>
+<meta name="description" content="">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="haar.js"></script>
+
+
+<script>
+
+function HSVtoRGB(h, s, v) {
+    var r, g, b, i, f, p, q, t;
+    if (h && s === undefined && v === undefined) {
+        s = h.s, v = h.v, h = h.h;
+    }
+    i = Math.floor(h * 6); f = h * 6 - i; p = v * (1 - s); q = v * (1 - f * s); t = v * (1 - (1 - f) * s);
+    switch (i % 6) {
+        case 0: r = v, g = t, b = p; break;
+        case 1: r = q, g = v, b = p; break;
+        case 2: r = p, g = v, b = t; break;
+        case 3: r = p, g = q, b = v; break;
+        case 4: r = t, g = p, b = v; break;
+        case 5: r = v, g = p, b = q; break;
+    }
+    return [Math.floor(r * 255),Math.floor(g*255),Math.floor(b*255)];
+}
+
+
+function point(imgd, x, y, r, g, b) {    
+    var idx = (x + (y * imgd.width)) * 4;
+    imgd.data[idx] = r;     
+    imgd.data[idx+1] = g;   
+    imgd.data[idx+2] = b;   
+    imgd.data[idx+3] = 255; 
+}
+
+function initialize() {
+    ctx = document.getElementById("myCanvas").getContext("2d");
+    ctx.fillStyle = "rgb(240,240,240)"; // light grey
+    ctx.fillRect(0, 0, 512, 512);
+    ctx = document.getElementById("colorscale").getContext("2d");
+    imgd = ctx.createImageData(20,512);
+    for (var y = 0; y < 512; ++y)
+        for(var x = 0; x < 20; ++x) {
+            rgb = HSVtoRGB(2/3*(y/512.0),1.0,1.0);
+            point(imgd, x, y, rgb[0], rgb[1], rgb[2]);
+        }
+    ctx.putImageData(imgd,0,0);
+    cv = document.getElementById("myCanvas2");
+}
+
+function doit() {    
+    var w = parseFloat(document.getElementById("regularization").value);
+    
+    var ctx = document.getElementById("myCanvas").getContext("2d");
+    
+    if (document.getElementById("simple_mode").checked)
+        model = new SimpleModel(POINTS, w);    
+    else {
+        model = new Model(POINTS, w);    
+        var n = parseFloat(document.getElementById("draws").value);
+        for(var i = 0; i < n; ++i)
+            model.draw();
+    }
+    
+    px = model.pixels(512);
+    
+    var imgd = ctx.createImageData(512,512);
+    for (var y = 0; y < 512; ++y)
+        for(var x = 0; x < 512; ++x) {
+            rgb = HSVtoRGB(2/3*Math.pow((1- (px.pixels[x][y]-px.min)/(px.max - px.min)),2.0),1.0,1.0);
+            point(imgd, x, y, rgb[0], rgb[1], rgb[2]);
+        }
+    ctx.putImageData(imgd,0,0);
+}
+
+// nn = new NN({tX:-0.5,tY:-0.5,phi:0.5,theta:0.3,sX:0.4,sY:0.4});
+
+function addDataPoint(e) {
+    
+    var x = 0;
+    var y = 0;
+   
+    var el = e.target;
+    while(el && !isNaN(el.offsetLeft) && !isNaN(el.offsetTop)) {    
+        x += el.offsetLeft - el.scrollLeft;
+        y += el.offsetTop - el.scrollTop;
+        el = el.offsetParent;
+    }
+    x = e.clientX - x;
+    y = e.clientY - y;
+
+    var ctx = cv.getContext("2d");
+    ctx.beginPath()
+    ctx.arc(x, y, 2, 0, 2 * Math.PI, false);    
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(0,0,0,0.5)";
+    ctx.stroke();
+    ctx.closePath();
+    
+    POINTS.push({x:(x+0.5)/512.0,y:(y+0.5)/512.0});    
+    if (document.getElementById("simple_mode").checked)
+        doit();
+}
+
+POINTS = [];
+
+function toggle_pca() {    
+    if (document.getElementById("simple_mode").checked)
+        document.getElementById("pca_mode").style.display = 'none';
+    else 
+         document.getElementById("pca_mode").style.display = 'block';
+       
+
+}
+
+
+</script>
+</head>
+<body>
+
+<!--[if lt IE 7]>
+<p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade
+    your browser</a> to improve your experience.</p>
+<![endif]-->
+
+<div>
+    <div style="position:relative;padding:0px;margin:0px;width:512px;height:512px;float:left;background:green;">
+        <canvas id="myCanvas" style="border:1px solid black;position:absolute;background:transparent;z-index:1;" width="512" height="512" onclick="addDataPoint(event)"></canvas>
+        <canvas id="myCanvas2" style="border:1px solid black;position:absolute;background:transparent;z-index:2;" width="512" height="512" onclick="addDataPoint(event)"></canvas>
+    </div>
+    <div style="float:left;position:relative">
+        <canvas id="colorscale" style="border:1px solid black;position:absolute;float:left;top:0px;left:10px;" width="20" height="512"></canvas>
+    </div>
+</div>
+
+<div style="position:absolute;top:532px;">    
+<label for="regularization">sparsiness</label>
+<input name="regularization" id="regularization" value="1.2"><br>
+<label for="simple_mode">fast mode</label><input type="checkbox" id="simple_mode" checked=true onchange="toggle_pca()"><br>
+<div id="pca_mode" style="display:none" >
+    <label for="draws">number of draws</label>
+    <input name="draws" id="draws" value="100"><br>
+    <button name="doit" onclick="doit()">sample</button>
+</div>
+
+
+
+
+<script>
+    initialize();
+</script>
+<br>
+
+
+<h2>What am I looking at exactly?</h2>
+<p>First of all, click on the canvas to represent a "draw".  In fast mode you're looking at the exact posterior distribution implied by the draw with the prior that the distribution which generated the draw has a sparse (in the L0 sense) representation in the Haar basis. As it turns out, this problem is tractable (albeit with a 2^d factor in there). In the other mode, you're looking at the same model, but integrated over many affiner transforms with a sigmoid squash, weighted by their total evidence of course.</p>
+<h2>What do you do with this?</h2>
+<p>You could compute mutual information and detect non trivial relationships between pairs of variables in a large dataset</p>
+<h2>Can I look at the source code?</h2>
+<p>Sure go ahead. Your eyes might bleed if you look at the html/gui part of this, but the statistical code is decently clean.</p>
+</div>
+
+
+</body></html>
